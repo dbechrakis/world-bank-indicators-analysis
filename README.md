@@ -1,10 +1,10 @@
-# World Bank Indicators Analysis
+# World Bank Indicators — Statistical & Multivariate Analysis
 
-A data-science project combining World Bank indicator data, Python analytics, SQLite, statistical analysis, visualization, and unsupervised learning.
+A data analytics case study combining **World Bank indicators, statistical analysis, SQL, visualization, outlier detection, and unsupervised learning** to explore economic and energy patterns across countries and regions.
 
-## Business / analytical focus
+## Executive summary
 
-The project studies six indicators across countries and regions:
+The analysis works with six indicators:
 
 - GDP
 - Inflation
@@ -13,21 +13,61 @@ The project studies six indicators across countries and regions:
 - Renewable electricity production
 - Renewable energy consumption
 
-The analysis covers data cleaning and standardization, regional aggregation, time-series analysis, correlation and covariance, outlier detection, and advanced pattern-discovery techniques.
+The workflow transforms heterogeneous country-level data into an analytical structure and then applies statistical and multivariate methods to investigate regional patterns, relationships, anomalies, and latent structure.
 
-## Analytical workflow
+## Analytical questions
 
-1. Load World Bank indicator CSV files.
-2. Standardize country names and map countries to continents.
-3. Reshape the World Bank wide-format data into a long analytical format.
-4. Export cleaned indicator datasets.
-5. Detect outliers using regional Z-scores and IQR thresholds.
-6. Compare European observations across decade intervals.
-7. Build regional time-series visualizations.
-8. Analyze relationships between indicators using correlation and covariance matrices.
-9. Apply NMF to identify latent indicator groupings.
-10. Apply PARAFAC tensor decomposition to explore country × year × indicator patterns.
-11. Load the analytical data into SQLite and run SQL-based regional and country queries.
+- How do economic and energy indicators differ across regions?
+- Which observations behave as statistical outliers?
+- How are the selected indicators correlated?
+- Can unsupervised methods reveal latent indicator groupings?
+- How can the cleaned analytical dataset support SQL-based exploration?
+
+## Workflow
+
+```text
+World Bank data
+      ↓
+Cleaning & standardization
+      ↓
+Long-format analytical dataset
+      ↓
+EDA & regional aggregation
+      ↓
+Outlier detection
+      ↓
+Correlation / covariance analysis
+      ↓
+NMF & PARAFAC
+      ↓
+SQLite + SQL analysis
+```
+
+## Methods
+
+### Data preparation
+
+- Standardize country names
+- Map countries to continents
+- Reshape wide-format indicator files into analytical long format
+- Export cleaned datasets for downstream analysis
+
+### Statistical analysis
+
+- Regional aggregation
+- Decade comparisons
+- Correlation and covariance matrices
+- Regional Z-score analysis
+- IQR-based outlier detection
+
+### Multivariate analysis
+
+- **NMF** for latent indicator structure
+- **PARAFAC tensor decomposition** for country × year × indicator patterns
+
+### SQL analytics
+
+Cleaned analytical data is loaded into **SQLite** to support regional and country-level queries.
 
 ## Repository structure
 
@@ -50,12 +90,21 @@ world-bank-indicators-analysis/
 
 ## Outputs
 
-The analysis script generates graphs, cleaned datasets, and a project log. These generated artifacts should remain separate from the source data and analysis code.
+The analysis generates cleaned datasets, visualizations, analytical outputs, and a project log. Generated artifacts are kept separate from the source analysis code.
 
-## Technical stack
+## Tech stack
 
-Python, pandas, NumPy, matplotlib, seaborn, scikit-learn, TensorLy, pycountry, pycountry-convert, SQLite.
+**Python · pandas · NumPy · Matplotlib · scikit-learn · TensorLy · SQLite · SQL · pycountry**
 
-## Portfolio note
+## Interpretation note
 
-This repository presents the analytical workflow as a portfolio project. The emphasis is on reproducibility, clear project structure, data preparation, statistical reasoning, and communicating analytical findings rather than presenting observational relationships as causal effects.
+The project is intentionally analytical rather than causal. Correlations, regional differences, and latent structures are treated as descriptive evidence and should not be interpreted as causal relationships without additional identification and validation.
+
+## Context
+
+Portfolio data analytics case study developed during an MSc Data Science programme at **The American College of Greece**.
+
+## Author
+
+**Dimitris Bechrakis**  
+Business & Data Analyst | M.Sc. Data Science
