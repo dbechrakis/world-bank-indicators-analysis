@@ -1,0 +1,8 @@
+__pycache__/
+*.db
+project_output.txt
+cleaned_data/
+graphs/
+.venv/
+
+.ipynb_checkpoints/
