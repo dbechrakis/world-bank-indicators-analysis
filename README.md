@@ -1,5 +1,7 @@
 # World Bank Indicators — Statistical & Multivariate Analysis
 
+[![Evidence checks](https://github.com/dbechrakis/world-bank-indicators-analysis/actions/workflows/evidence.yml/badge.svg)](https://github.com/dbechrakis/world-bank-indicators-analysis/actions/workflows/evidence.yml)
+
 A data analytics case study combining **World Bank indicators, statistical analysis, SQL, visualization, outlier detection, and unsupervised learning** to explore economic and energy patterns across countries and regions.
 
 ## Executive summary
@@ -124,3 +126,7 @@ Portfolio data analytics case study developed during an MSc Data Science program
 
 **Dimitris Bechrakis**  
 Business & Data Analyst | M.Sc. Data Science
+
+## Licensing
+
+See [licensing scope](LICENSING.md) for the MIT-licensed verification code and the separately governed project materials.
