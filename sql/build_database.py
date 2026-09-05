@@ -2,6 +2,7 @@ import sqlite3
 import pandas as pd
 import sys
 import os
+from pathlib import Path
 import pycountry
 import pycountry_convert as pc
 
@@ -9,7 +10,7 @@ import pycountry_convert as pc
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 def get_file_path(filename):
-    return os.path.join(script_dir, filename)
+    return str(Path(script_dir).parent / "data" / "raw" / filename)
 
 # --- 2. DATA PROCESSING LOGIC ---
 
@@ -57,7 +58,7 @@ def long_format_corrected(df):
     
     # THE FIX: We explicitly include 'Country Code' in id_vars so it is kept
     id_vars = ['Country Name', 'Country Code', 'Country Name Standardized', 'Region', 'Indicator Name']
-    year_cols = [c for c in df.columns if c not in id_vars]
+    year_cols = [c for c in df.columns if str(c).isdigit() and len(str(c)) == 4]
     
     df_long = df.melt(
         id_vars=['Country Name', 'Country Code', 'Country Name Standardized', 'Region', 'Indicator Name'],
@@ -93,6 +94,7 @@ def create_database(db_name='world_bank.db'):
     print(f"\n=== DATABASE CREATION ({db_name}) ===")
     
     conn = sqlite3.connect(db_path)
+    conn.execute('PRAGMA foreign_keys = ON')
     c = conn.cursor()
 
     c.execute('''CREATE TABLE IF NOT EXISTS countries 
@@ -103,6 +105,7 @@ def create_database(db_name='world_bank.db'):
     
     c.execute('''CREATE TABLE IF NOT EXISTS "values" 
                  (country_id TEXT, indicator_id TEXT, year INTEGER, value REAL,
+                 PRIMARY KEY(country_id, indicator_id, year),
                  FOREIGN KEY(country_id) REFERENCES countries(country_id),
                  FOREIGN KEY(indicator_id) REFERENCES indicators(indicator_id))''')
                  
@@ -113,10 +116,13 @@ def create_database(db_name='world_bank.db'):
 def populate_database(conn, df):
     print("\n=== POPULATING DATABASE ===")
     
+    conn.execute('DELETE FROM "values"')
+    conn.execute('DELETE FROM countries')
+    conn.execute('DELETE FROM indicators')
     # A. Countries
     countries = df[['Country Code', 'Country Name Standardized', 'Region']].drop_duplicates()
     countries.columns = ['country_id', 'country_name', 'region']
-    countries.to_sql('countries', conn, if_exists='replace', index=False)
+    countries.to_sql('countries', conn, if_exists='append', index=False)
     
     # B. Indicators
     indicators_data = {
@@ -125,12 +131,13 @@ def populate_database(conn, df):
                            'GDP', 'Inflation', 'Exports'],
         'unit': ['% Total', '% Total', '% Total', 'USD', '% Annual', '% GDP']
     }
-    pd.DataFrame(indicators_data).to_sql('indicators', conn, if_exists='replace', index=False)
+    pd.DataFrame(indicators_data).to_sql('indicators', conn, if_exists='append', index=False)
     
     # C. Values
     values = df[['Country Code', 'Indicator Short', 'Year', 'Value']].copy()
     values.columns = ['country_id', 'indicator_id', 'year', 'value']
-    values.to_sql('values', conn, if_exists='replace', index=False)
+    values.to_sql('values', conn, if_exists='append', index=False)
+    conn.commit()
     print("Data inserted successfully.")
 
 def run_queries(conn):

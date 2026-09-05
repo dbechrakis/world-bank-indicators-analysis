@@ -88,6 +88,22 @@ world-bank-indicators-analysis/
         └── exports.csv
 ```
 
+## Reproduction and verified coverage
+
+```bash
+pip install -r requirements.txt
+python scripts/world_bank_analysis.py
+python sql/build_database.py
+```
+
+Both scripts were executed against all six committed source files in this review. The database contains **10095 country–indicator–year observations**. [Coverage by indicator](outputs/indicator_coverage.csv) · [Database checks](outputs/validation.json).
+
+The database window is the last ten calendar years relative to the newest observation in the combined data. Individual indicators have different latest years and missingness; this is not a balanced panel. Country averages are unweighted and do not estimate population-weighted regional outcomes.
+
+NMF uses within-indicator median imputation before scaling. PARAFAC masks missing observations rather than treating them as zero. Both decompositions are descriptive and their stability across ranks/imputation choices has not been established.
+
+![Europe indicator overview](outputs/europe_indicators.png)
+
 ## Outputs
 
 The analysis generates cleaned datasets, visualizations, analytical outputs, and a project log. Generated artifacts are kept separate from the source analysis code.

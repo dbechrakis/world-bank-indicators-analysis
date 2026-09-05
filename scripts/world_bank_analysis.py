@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import sys
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[1]
+DATA_DIR = ROOT / "data" / "raw"
+os.chdir(ROOT)
 
 # Advanced libraries we needed for the project requirements
 from sklearn.preprocessing import MinMaxScaler
@@ -102,7 +106,7 @@ def long_format(df):
     ]
     
     # Grab all the remaining columns (which are the Years)
-    year_cols = [c for c in df.columns if c not in id_vars]
+    year_cols = [c for c in df.columns if str(c).isdigit() and len(str(c)) == 4]
 
     df_long = df.melt(
         id_vars=id_vars,
@@ -401,7 +405,8 @@ def perform_nmf(master_df):
         index='Country Name Standardized', 
         columns='Indicator Short', 
         values='Value', aggfunc='mean'
-    ).fillna(0)
+    )
+    nmf_data = nmf_data.fillna(nmf_data.median()).dropna(axis=1)
     
     # We must scale the data to 0-1 because NMF breaks with negative numbers
     scaler = MinMaxScaler()
@@ -428,7 +433,7 @@ def perform_tensor_decomp(master_df):
         index=['Country Name Standardized', 'Year'],
         columns='Indicator Short',
         values='Value'
-    ).dropna()
+    )
     
     countries = tensor_df.index.get_level_values(0).unique()
     years = tensor_df.index.get_level_values(1).unique()
@@ -436,7 +441,7 @@ def perform_tensor_decomp(master_df):
     
     # 2. Building the 3D numpy array
     tensor_shape = (len(countries), len(years), len(indicators))
-    tensor = np.zeros(tensor_shape)
+    tensor = np.full(tensor_shape, np.nan)
     
     for c, country in enumerate(countries):
         for y, year in enumerate(years):
@@ -446,18 +451,21 @@ def perform_tensor_decomp(master_df):
             except KeyError:
                 pass
 
+    observed = np.isfinite(tensor)
+    # Missing cells remain excluded from the factorization objective.
     # 3. Z-score normalization per indicator slice
     # We realized this was necessary so that GDP (trillions) doesn't overpower everything else
     for i in range(len(indicators)):
         indicator_slice = tensor[:, :, i]
-        mean = np.mean(indicator_slice)
-        std = np.std(indicator_slice)
+        mean = np.nanmean(indicator_slice)
+        std = np.nanstd(indicator_slice)
         if std > 0:
             tensor[:, :, i] = (indicator_slice - mean) / std
             
     # 4. Running PARAFAC decomposition
     rank = 3
-    weights, factors = parafac(tensor, rank=rank)
+    tensor = np.nan_to_num(tensor, nan=0.0)
+    weights, factors = parafac(tensor, rank=rank, mask=observed, random_state=42)
     
     # The 3rd factor corresponds to the Indicators
     indicator_factors = factors[2]
@@ -491,22 +499,22 @@ if __name__ == "__main__":
     
     try:
         # Loading our 6 datasets
-        df1 = data_harvesting('nuclear_production.csv')
+        df1 = data_harvesting(DATA_DIR / 'nuclear_production.csv')
         export_indicator_csv(df1, '%', 'nuclear_production_cleaned.csv')
         
-        df2 = data_harvesting('renewable_production.csv')
+        df2 = data_harvesting(DATA_DIR / 'renewable_production.csv')
         export_indicator_csv(df2, '%', 'renewable_production_cleaned.csv')
         
-        df3 = data_harvesting('renewable_consumption.csv')
+        df3 = data_harvesting(DATA_DIR / 'renewable_consumption.csv')
         export_indicator_csv(df3, '%', 'renewable_consumption_cleaned.csv')
         
-        df4 = data_harvesting('gdp.csv')
+        df4 = data_harvesting(DATA_DIR / 'gdp.csv')
         export_indicator_csv(df4, '$', 'gdp_cleaned.csv')
         
-        df5 = data_harvesting('inflation.csv')
+        df5 = data_harvesting(DATA_DIR / 'inflation.csv')
         export_indicator_csv(df5, '%', 'inflation_cleaned.csv')
         
-        df6 = data_harvesting('exports.csv')
+        df6 = data_harvesting(DATA_DIR / 'exports.csv')
         export_indicator_csv(df6, '%', 'exports_cleaned.csv')
         
     except Exception as e:
