@@ -76,10 +76,14 @@ Cleaned analytical data is loaded into **SQLite** to support regional and countr
 ```text
 world-bank-indicators-analysis/
 ├── README.md
+├── wb_indicators/
+│   ├── prepare.py              # Load, standardise countries, reshape to long format
+│   └── outliers.py             # Z-scores and IQR fences (no plotting, no I/O)
 ├── scripts/
-│   └── world_bank_analysis.py
+│   └── world_bank_analysis.py  # Outliers, plots, NMF and PARAFAC pipeline
 ├── sql/
 │   └── build_database.py
+├── tests/                      # Data preparation, outlier and database tests
 └── data/
     └── raw/
         ├── nuclear_production.csv
@@ -97,6 +101,8 @@ pip install -r requirements.txt
 python scripts/world_bank_analysis.py
 python sql/build_database.py
 ```
+
+Run the tests with `python -m unittest discover -s tests -v`.
 
 Both scripts were executed against all six committed source files in this review. The database contains **10095 country–indicator–year observations**. [Coverage by indicator](outputs/indicator_coverage.csv) · [Database checks](outputs/validation.json).
 
