@@ -1,15 +1,17 @@
 import pandas as pd
 import numpy as np
-import pycountry
-import pycountry_convert as pc
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import sys
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 DATA_DIR = ROOT / "data" / "raw"
-os.chdir(ROOT)
+
+from wb_indicators.prepare import data_harvesting, long_format, prepare_master_dataset
+from wb_indicators.outliers import iqr_bounds, iqr_outlier_mask, zscores
 
 # Advanced libraries we needed for the project requirements
 from sklearn.preprocessing import MinMaxScaler
@@ -17,15 +19,13 @@ from sklearn.decomposition import NMF
 from tensorly.decomposition import parafac
 from matplotlib.colors import SymLogNorm
 
-# Making sure we have a place to save the output graphs
-if not os.path.exists('graphs'):
-    os.makedirs('graphs')
+os.chdir(ROOT)
+os.makedirs("graphs", exist_ok=True)
+
 
 class DualLogger:
-    """
-    We added this helper class so we could see the output in the terminal
-    BUT also save it to a text file
-    """
+    """Mirror stdout to a log file."""
+
     def __init__(self, filename):
         self.terminal = sys.stdout
         self.log = open(filename, "w")
@@ -38,87 +38,6 @@ class DualLogger:
         self.terminal.flush()
         self.log.flush()
 
-# Redirect stdout so everything prints to the log file too
-sys.stdout = DualLogger("project_output.txt")
-
-
-# ==========================================
-# 1. DATA HARVESTING & CLEANING
-# ==========================================
-
-def data_harvesting(file):
-    print(f"\n--- Processing File: {file} ---")
-    
-    # World Bank data always has 4 rows of metadata at the top, so we skip them
-    df = pd.read_csv(file, skiprows=4)
-    
-    # Dropping columns that are completely empty
-    df = df.dropna(axis=1, how='all')
-        
-    def country_standardized(code):
-        # Cleaning up the names in case of whitespace
-        df['Country Name'] = df['Country Name'].str.strip().str.title()
-        try:
-            # We used pycountry to turn the 3-letter code into the official name
-            # If the country code doesn't correspond to any official name, it gets flagged
-            country = pycountry.countries.get(alpha_3=code)
-            return country.name if country else "Not a country"
-        except:
-            return "Not a country"
-            
-    df['Country Name Standardized'] = df['Country Code'].apply(country_standardized)
-    
-    # We filter out "Not a country" rows because we want country-level data
-    df = df[df['Country Name Standardized'] != 'Not a country']
-    
-    def country_to_region(code):
-        try:
-            country = pycountry.countries.get(alpha_3=code)
-            if country is None: return "Unknown"
-            
-            # Mapping countries to Continents
-            region_code = pc.country_alpha2_to_continent_code(country.alpha_2)
-            
-            continent_map = {
-                "AF": "Africa", "AS": "Asia", "EU": "Europe",
-                "NA": "North America", "SA": "South America",
-                "OC": "Oceania", "AN": "Antarctica"
-            }
-            return continent_map.get(region_code, "Unknown")
-        except:
-            # Handling edge cases when not in the library
-            return "Unknown"
-            
-    df['Region'] = df['Country Code'].apply(country_to_region)
-    print(f"Loaded and standardized {file} successfully.")
-    return df
-
-def long_format(df):
-
-    # Transforming from Wide format (Years as columns) to Long format.
-    
-    id_vars = [
-        'Country Code',
-        'Country Name Standardized',
-        'Region',
-        'Indicator Name',
-        'Indicator Code'
-    ]
-    
-    # Grab all the remaining columns (which are the Years)
-    year_cols = [c for c in df.columns if str(c).isdigit() and len(str(c)) == 4]
-
-    df_long = df.melt(
-        id_vars=id_vars,
-        value_vars=year_cols,
-        var_name='Year',
-        value_name='Value'
-    )
-
-    df_long = df_long.dropna(subset=['Value'])
-    df_long['Year'] = pd.to_numeric(df_long['Year'], errors='coerce')
-
-    return df_long
 
 def export_indicator_csv(df, unit, output_filename):
     # We saved the cleaned data to CSVs
@@ -153,24 +72,11 @@ def outliers_last10(df, indicator_label):
     
     # We calculate Z-scores per region
     for region, region_data in df_long.groupby('Region'): 
-        values = region_data['Value'].to_numpy() 
-        mean = np.nanmean(values) 
-        std = np.nanstd(values) 
-        if std == 0: 
-            z = np.zeros(len(values)) 
-        else: 
-            z = (values - mean) / std 
-        # Assign Z-scores back 
-        df_long.loc[region_data.index, 'Z Score'] = z.astype('float64') 
-        # Standard IQR method for finding the thresholds, per region 
-        Q1 = np.nanpercentile(z, 25) 
-        Q3 = np.nanpercentile(z, 75) 
-        IQR = Q3 - Q1 
-        lower = Q1 - 1.5 * IQR 
-        upper = Q3 + 1.5 * IQR 
-        outliers = (z < lower) | (z > upper) 
-        df_long.loc[region_data.index, 'Outlier'] = outliers 
-    
+        z = zscores(region_data['Value'].to_numpy())
+        df_long.loc[region_data.index, 'Z Score'] = z.astype('float64')
+        # Standard IQR method for finding the thresholds, per region
+        df_long.loc[region_data.index, 'Outlier'] = iqr_outlier_mask(z)
+
     total_outliers = df_long['Outlier'].sum() 
     percent_outliers = df_long['Outlier'].mean() * 100 
     print(f"Total outliers found: {total_outliers} ({percent_outliers:.2f}%)")
@@ -223,21 +129,14 @@ def europe_decade_outliers(df, indicator_label):
     
     # Calculating Z-scores inside each specific time bucket
     for interval, interval_df in region_df.groupby('Interval'):
-        values = interval_df['Value'].to_numpy()
-        mean = np.nanmean(values)
-        std = np.nanstd(values)
-        if std == 0:
-            z = np.zeros(len(values))
-        else:
-            z = (values - mean) / std
-        region_df.loc[interval_df.index, 'Z Score'] = z
+        region_df.loc[interval_df.index, 'Z Score'] = zscores(interval_df['Value'].to_numpy())
 
     Q1 = region_df['Z Score'].quantile(0.25)
     Q3 = region_df['Z Score'].quantile(0.75)
     IQR = Q3 - Q1
     lower = Q1 - 1.5 * IQR
     upper = Q3 + 1.5 * IQR
-    
+
     region_df['Outlier'] = (region_df['Z Score'] < lower) | (region_df['Z Score'] > upper)
     europe_removed_count = region_df['Outlier'].sum()
     percent_removed = europe_removed_count / len(region_df) * 100
@@ -285,7 +184,6 @@ def europe_decade_outliers(df, indicator_label):
     plt.tight_layout()
     plt.savefig(f"graphs/Boxplot_Europe_After_{indicator_label.replace(' ', '_')}.png")
     plt.close()
-    plt.close()
     
     return region_df
 
@@ -293,22 +191,6 @@ def europe_decade_outliers(df, indicator_label):
 # ==========================================
 # 3. MASTER DATA PREP
 # ==========================================
-
-def prepare_master_dataset(dfs, indicator_names):
-    # We combine all the individual indicator dataframes into one huge master file
-    master_list = []
-    for df, name in zip(dfs, indicator_names):
-        df_long = long_format(df)
-        df_long['Indicator Short'] = name
-        master_list.append(df_long)
-    
-    full_df = pd.concat(master_list, ignore_index=True)
-    
-    # We filter to the last 10 years again
-    max_year = full_df['Year'].max()
-    full_df = full_df[full_df['Year'] >= (max_year - 9)]
-    return full_df
-
 
 # ==========================================
 # 4. VISUALIZATION
@@ -495,6 +377,7 @@ def perform_tensor_decomp(master_df):
 # ==========================================
 
 if __name__ == "__main__":
+    sys.stdout = DualLogger("project_output.txt")
     print("Starting the analysis pipeline...\n")
     
     try:
