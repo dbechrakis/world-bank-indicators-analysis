@@ -1,4 +1,4 @@
-# World Bank Indicators — Statistical & Multivariate Analysis
+# World Bank Indicators: Statistical & Multivariate Analysis
 
 [![Evidence checks](https://github.com/dbechrakis/world-bank-indicators-analysis/actions/workflows/evidence.yml/badge.svg)](https://github.com/dbechrakis/world-bank-indicators-analysis/actions/workflows/evidence.yml)
 
@@ -104,9 +104,9 @@ python sql/build_database.py
 
 Run the tests with `python -m unittest discover -s tests -v`.
 
-Both scripts were executed against all six committed source files in this review. The database contains **10095 country–indicator–year observations**. [Coverage by indicator](outputs/indicator_coverage.csv) · [Database checks](outputs/validation.json).
+Both scripts were executed against all six committed source files in this review. The database contains **10095 country-indicator-year observations**. [Coverage by indicator](outputs/indicator_coverage.csv) · [Database checks](outputs/validation.json).
 
-The database window is the last ten calendar years relative to the newest observation in the combined data. Individual indicators have different latest years and missingness; this is not a balanced panel. Country averages are unweighted and do not estimate population-weighted regional outcomes.
+The database window is the last ten calendar years relative to the newest observation in the combined data. Individual indicators have different latest years and missingness. This is not a balanced panel. Country averages are unweighted and do not estimate population-weighted regional outcomes.
 
 NMF uses within-indicator median imputation before scaling. PARAFAC masks missing observations rather than treating them as zero. Both decompositions are descriptive and their stability across ranks/imputation choices has not been established.
 
