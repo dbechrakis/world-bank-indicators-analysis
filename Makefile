@@ -1,7 +1,7 @@
 # Run the same checks as CI: `make check`. Override the interpreter with `make check PYTHON=python3.12`.
 PYTHON ?= python
 
-.PHONY: install check lint evidence test
+.PHONY: install check lint evidence test structure
 
 install:
 	$(PYTHON) -m pip install -r requirements.txt
@@ -15,5 +15,8 @@ evidence:
 
 test:
 	$(PYTHON) -m unittest discover -s tests -v
+
+structure:
+	$(PYTHON) scripts/structure_analysis.py
 
 check: lint evidence test
