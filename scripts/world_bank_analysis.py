@@ -1,59 +1,49 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import os
-import sys
+import argparse
 from pathlib import Path
+import sys
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+import seaborn as sns  # noqa: E402
+from matplotlib.colors import SymLogNorm  # noqa: E402
+from sklearn.decomposition import NMF  # noqa: E402
+from sklearn.preprocessing import MinMaxScaler  # noqa: E402
+from tensorly.decomposition import parafac  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+from wb_indicators.outliers import iqr_outlier_mask, zscores  # noqa: E402
+from wb_indicators.prepare import data_harvesting, long_format, prepare_master_dataset  # noqa: E402
+from wb_indicators.runlog import tee_stdout  # noqa: E402
+
 DATA_DIR = ROOT / "data" / "raw"
-
-from wb_indicators.prepare import data_harvesting, long_format, prepare_master_dataset
-from wb_indicators.outliers import iqr_bounds, iqr_outlier_mask, zscores
-
-# Advanced libraries we needed for the project requirements
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.decomposition import NMF
-from tensorly.decomposition import parafac
-from matplotlib.colors import SymLogNorm
-
-os.chdir(ROOT)
-os.makedirs("graphs", exist_ok=True)
+OUTPUT_DIR = ROOT
 
 
-class DualLogger:
-    """Mirror stdout to a log file."""
-
-    def __init__(self, filename):
-        self.terminal = sys.stdout
-        self.log = open(filename, "w")
-
-    def write(self, message):
-        self.terminal.write(message)
-        self.log.write(message)
-
-    def flush(self):
-        self.terminal.flush()
-        self.log.flush()
+def graph_path(name):
+    """Path of a figure inside the output directory, creating the folder on first use."""
+    folder = OUTPUT_DIR / "graphs"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder / name
 
 
 def export_indicator_csv(df, unit, output_filename):
-    # We saved the cleaned data to CSVs
-    if not os.path.exists('cleaned_data'):
-        os.makedirs('cleaned_data')
-        
+    folder = OUTPUT_DIR / "cleaned_data"
+    folder.mkdir(parents=True, exist_ok=True)
+
     df_long = long_format(df)
     df_long = df_long.rename(columns={'Country Name Standardized': 'Country Name'})
     df_long['Unit'] = unit
 
-    # Reordering columns
     cols = ['Country Code', 'Country Name', 'Region', 'Indicator Code', 'Indicator Name', 'Unit', 'Value', 'Year']
     df_long = df_long[cols]
 
-    output_path = os.path.join('cleaned_data', output_filename)
-    df_long.to_csv(output_path, index=False)
+    df_long.to_csv(folder / output_filename, index=False)
     print(f"Exported clean data to: {output_filename}")
 
 
@@ -87,12 +77,12 @@ def outliers_last10(df, indicator_label):
     plt.title(f'{indicator_label} - Before Removing Outliers')
     plt.ylabel('Z Score')
     plt.tight_layout()
-    plt.savefig(f"graphs/Boxplot_Before_{indicator_label.replace(' ', '_')}.png")
+    plt.savefig(graph_path(f"Boxplot_Before_{indicator_label.replace(' ', '_')}.png"))
     plt.close()
     
     # Remove outliers
     removed_count = df_long['Outlier'].sum()
-    df_long = df_long[df_long['Outlier'] != True].copy()
+    df_long = df_long[~df_long['Outlier']].copy()
 
     # Boxplot AFTER removing outliers, include number removed in title
     plt.figure(figsize=(6, 8))
@@ -100,7 +90,7 @@ def outliers_last10(df, indicator_label):
     plt.title(f'{indicator_label} - After Removing Outliers\nRemoved: {removed_count} values, Percent of Total: {percent_outliers:.2f}%')
     plt.ylabel('Z Score')
     plt.tight_layout()    
-    plt.savefig(f"graphs/Boxplot_After_{indicator_label.replace(' ', '_')}.png")
+    plt.savefig(graph_path(f"Boxplot_After_{indicator_label.replace(' ', '_')}.png"))
     plt.close()
     
     return df_long
@@ -122,7 +112,8 @@ def europe_decade_outliers(df, indicator_label):
         
     def assign_interval(year):
         for s, e in intervals:
-            if s <= year <= e: return f"{s}-{e}"
+            if s <= year <= e:
+                return f"{s}-{e}"
         return None
 
     region_df["Interval"] = region_df["Year"].apply(assign_interval)
@@ -167,11 +158,11 @@ def europe_decade_outliers(df, indicator_label):
     plt.title(f'Europe Decades - Before Outlier Removal\n{indicator_label}')
     plt.ylabel('Z Score')
     plt.tight_layout()
-    plt.savefig(f"graphs/Boxplot_Europe_Before_{indicator_label.replace(' ', '_')}.png")
+    plt.savefig(graph_path(f"Boxplot_Europe_Before_{indicator_label.replace(' ', '_')}.png"))
     plt.close()
 
     # Boxplot AFTER removing outliers, include number removed in title
-    region_df = region_df[region_df['Outlier'] != True].copy()
+    region_df = region_df[~region_df['Outlier']].copy()
 
     plt.figure(figsize=(6, 8))
     region_df['Z Score'].dropna().plot(kind='box', color='green')
@@ -182,7 +173,7 @@ def europe_decade_outliers(df, indicator_label):
     )
     plt.ylabel('Z Score')
     plt.tight_layout()
-    plt.savefig(f"graphs/Boxplot_Europe_After_{indicator_label.replace(' ', '_')}.png")
+    plt.savefig(graph_path(f"Boxplot_Europe_After_{indicator_label.replace(' ', '_')}.png"))
     plt.close()
     
     return region_df
@@ -204,7 +195,8 @@ def generate_time_series(master_df):
     
     for region in regions:
         region_data = master_df[master_df['Region'] == region]
-        if region_data.empty: continue
+        if region_data.empty:
+            continue
         
         # We used a 3x2 grid so we can see all 6 indicators at once
         fig, axes = plt.subplots(3, 2, figsize=(15, 12))
@@ -213,7 +205,8 @@ def generate_time_series(master_df):
         
         for i, indicator in enumerate(indicators):
             ind_data = region_data[region_data['Indicator Short'] == indicator]
-            if ind_data.empty: continue
+            if ind_data.empty:
+                continue
             
             # We decided to use Seaborn here because it handles the confidence interval shading automatically
             sns.lineplot(data=ind_data, x='Year', y='Value', ax=axes[i], marker='o')
@@ -224,7 +217,7 @@ def generate_time_series(master_df):
             axes[i].grid(True, alpha=0.3)
             
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-        plt.savefig(f"graphs/TimeSeries_{region}.png")
+        plt.savefig(graph_path(f"TimeSeries_{region}.png"))
         plt.close()
         print(f"Graph saved for: {region}")
 
@@ -235,7 +228,8 @@ def analyze_relationships(master_df):
     
     for region in regions:
         region_data = master_df[master_df['Region'] == region]
-        if region_data.empty: continue
+        if region_data.empty:
+            continue
 
         # We need to pivot so indicators become columns
         pivot_df = region_data.pivot_table(
@@ -250,7 +244,7 @@ def analyze_relationships(master_df):
         sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
         plt.title(f'Correlation Matrix - {region}')
         plt.tight_layout()
-        plt.savefig(f"graphs/Heatmap_Correlation_{region}.png")
+        plt.savefig(graph_path(f"Heatmap_Correlation_{region}.png"))
         plt.close()
 
         # 2. Covariance Matrix
@@ -270,7 +264,7 @@ def analyze_relationships(master_df):
             plt.title(f'Covariance Matrix - {region}')
             
         plt.tight_layout()
-        plt.savefig(f"graphs/Heatmap_Covariance_{region}.png")
+        plt.savefig(graph_path(f"Heatmap_Covariance_{region}.png"))
         plt.close()
 
 
@@ -294,8 +288,8 @@ def perform_nmf(master_df):
     scaler = MinMaxScaler()
     data_scaled = scaler.fit_transform(nmf_data)
     
-    model = NMF(n_components=2, init='random', random_state=42)
-    W = model.fit_transform(data_scaled)
+    model = NMF(n_components=2, init='random', random_state=42, max_iter=2000)
+    model.fit(data_scaled)
     H = model.components_
     
     indicators = nmf_data.columns
@@ -368,7 +362,7 @@ def perform_tensor_decomp(master_df):
     plt.xticks(rotation=45)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig("graphs/Tensor_Patterns.png")
+    plt.savefig(graph_path("Tensor_Patterns.png"))
     plt.close()
 
 
@@ -376,65 +370,56 @@ def perform_tensor_decomp(master_df):
 # EXECUTION
 # ==========================================
 
-if __name__ == "__main__":
-    sys.stdout = DualLogger("project_output.txt")
+DATASETS = [
+    ("nuclear_production", "Nuclear Production", "Nuclear", "%"),
+    ("renewable_production", "Renewable Production", "Renew_Prod", "%"),
+    ("renewable_consumption", "Renewable Consumption", "Renew_Cons", "%"),
+    ("gdp", "GDP", "GDP", "$"),
+    ("inflation", "Inflation", "Inflation", "%"),
+    ("exports", "Exports", "Exports", "%"),
+]
+
+
+def run(data_dir):
     print("Starting the analysis pipeline...\n")
-    
-    try:
-        # Loading our 6 datasets
-        df1 = data_harvesting(DATA_DIR / 'nuclear_production.csv')
-        export_indicator_csv(df1, '%', 'nuclear_production_cleaned.csv')
-        
-        df2 = data_harvesting(DATA_DIR / 'renewable_production.csv')
-        export_indicator_csv(df2, '%', 'renewable_production_cleaned.csv')
-        
-        df3 = data_harvesting(DATA_DIR / 'renewable_consumption.csv')
-        export_indicator_csv(df3, '%', 'renewable_consumption_cleaned.csv')
-        
-        df4 = data_harvesting(DATA_DIR / 'gdp.csv')
-        export_indicator_csv(df4, '$', 'gdp_cleaned.csv')
-        
-        df5 = data_harvesting(DATA_DIR / 'inflation.csv')
-        export_indicator_csv(df5, '%', 'inflation_cleaned.csv')
-        
-        df6 = data_harvesting(DATA_DIR / 'exports.csv')
-        export_indicator_csv(df6, '%', 'exports_cleaned.csv')
-        
-    except Exception as e:
-        print(f"CRITICAL ERROR: {e}")
-        sys.exit()
+    frames = []
+    for file_stem, _, _, unit in DATASETS:
+        frame = data_harvesting(data_dir / f"{file_stem}.csv")
+        export_indicator_csv(frame, unit, f"{file_stem}_cleaned.csv")
+        frames.append(frame)
 
-    # Outlier checks
     print("\n--- Running Outlier Checks ---")
-    outliers_last10(df1, "Nuclear Production")
-    europe_decade_outliers(df1, "Nuclear Production")
-    
-    outliers_last10(df2, "Renewable Production")
-    europe_decade_outliers(df2, "Renewable Production")
-    
-    outliers_last10(df3, "Renewable Consumption")
-    europe_decade_outliers(df3, "Renewable Consumption")
-    
-    outliers_last10(df4, "GDP")
-    europe_decade_outliers(df4, "GDP")
-    
-    outliers_last10(df5, "Inflation")
-    europe_decade_outliers(df5, "Inflation")
-    
-    outliers_last10(df6, "Exports")
-    europe_decade_outliers(df6, "Exports")
+    for frame, (_, label, _, _) in zip(frames, DATASETS):
+        outliers_last10(frame, label)
+        europe_decade_outliers(frame, label)
 
-    # Merging for advanced models
-    dfs = [df1, df2, df3, df4, df5, df6]
-    names = ["Nuclear", "Renew_Prod", "Renew_Cons", "GDP", "Inflation", "Exports"]
-    master_df = prepare_master_dataset(dfs, names)
-    
-    # Generating Plots
-    generate_time_series(master_df) 
+    master_df = prepare_master_dataset(frames, [short for _, _, short, _ in DATASETS])
+
+    generate_time_series(master_df)
     analyze_relationships(master_df)
-    
-    # Running Models
+
     perform_nmf(master_df)
     perform_tensor_decomp(master_df)
 
     print("\nDone. All results saved to the graphs/ folder.")
+
+
+def main(argv=None):
+    global OUTPUT_DIR
+    parser = argparse.ArgumentParser(description="Run the World Bank indicator analysis.")
+    parser.add_argument("--data-dir", type=Path, default=DATA_DIR)
+    parser.add_argument("--output-dir", type=Path, default=ROOT)
+    args = parser.parse_args(argv)
+    OUTPUT_DIR = args.output_dir
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        with tee_stdout(OUTPUT_DIR / "project_output.txt"):
+            run(args.data_dir)
+    except Exception as error:
+        print(f"CRITICAL ERROR: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

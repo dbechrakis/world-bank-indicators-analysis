@@ -7,7 +7,7 @@ install:
 	$(PYTHON) -m pip install -r requirements.txt
 
 lint:
-	$(PYTHON) -m ruff check wb_indicators tests --select E4,E7,E9,F
+	$(PYTHON) -m ruff check wb_indicators scripts tests --select E4,E7,E9,F
 
 evidence:
 	$(PYTHON) ci/verify_evidence.py

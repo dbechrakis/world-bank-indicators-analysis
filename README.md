@@ -98,7 +98,8 @@ world-bank-indicators-analysis/
 ├── wb_indicators/
 │   ├── prepare.py              # Load, standardise countries, reshape to long format
 │   ├── outliers.py             # Z-scores and IQR fences (no plotting, no I/O)
-│   └── structure.py            # Stability, shuffled-null and held-out checks for NMF and PARAFAC
+│   ├── structure.py            # Stability, shuffled-null and held-out checks for NMF and PARAFAC
+│   └── runlog.py               # Mirror printed output to a log file and restore stdout
 ├── scripts/
 │   ├── world_bank_analysis.py  # Outliers, plots, NMF and PARAFAC pipeline
 │   └── structure_analysis.py   # Checks that test whether that structure is real
@@ -119,7 +120,7 @@ world-bank-indicators-analysis/
 
 ```bash
 pip install -r requirements.txt
-python scripts/world_bank_analysis.py
+python scripts/world_bank_analysis.py   # optional: --data-dir, --output-dir. Exits 1 if a data file is missing
 python sql/build_database.py
 python scripts/structure_analysis.py   # about 15 seconds, writes outputs/structure_findings.json
 ```
