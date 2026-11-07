@@ -4,6 +4,8 @@
 
 A data analytics case study combining **World Bank indicators, statistical analysis, SQL, visualization, outlier detection, and unsupervised learning** to explore economic and energy patterns across countries and regions.
 
+**Result:** Only 32 of 203 countries produce nuclear power, and economy size predicts which ones (AUC 0.91). NMF and PARAFAC barely beat shuffled columns, so the latent-group reading is not supported.
+
 ## Executive summary
 
 The analysis works with six indicators:
@@ -154,7 +156,7 @@ Portfolio data analytics case study developed during an MSc Data Science program
 ## Author
 
 **Dimitris Bechrakis**  
-Business & Data Analyst | M.Sc. Data Science
+Business Analyst · Commercial Analytics & Experimentation · Applied Data Science
 
 ## Licensing
 
