@@ -4,7 +4,7 @@
 
 A data analytics case study combining **World Bank indicators, statistical analysis, SQL, visualization, outlier detection, and unsupervised learning** to explore economic and energy patterns across countries and regions.
 
-**Result:** Only 32 of 203 countries produce nuclear power, and economy size predicts which ones (AUC 0.91). NMF and PARAFAC barely beat shuffled columns, so the latent-group reading is not supported.
+**Result:** Only 32 of 203 countries produce nuclear power, and economy size predicts which ones (AUC 0.91). NMF and PARAFAC find structure that is real but weak: rank-2 NMF beats all 40 shuffled copies, by a small margin, so it does not support reading the components as groups of indicators.
 
 ## Executive summary
 
@@ -27,12 +27,12 @@ Everything below is descriptive. It uses ten-year country means, and GDP is curr
 
 **2. Renewable share of final energy rises and then falls with economy size.** Median share by GDP quintile, smallest to largest: 11.9%, 25.7%, 30.5%, 23.7%, 13.2%. A single rank correlation misses this (Spearman −0.04, CI −0.17 to 0.10, n=207).
 
-**3. NMF and PARAFAC find little shared structure, and the earlier reading of them as latent groups is not supported.** The checks are in [`structure_analysis.py`](scripts/structure_analysis.py).
+**3. NMF and PARAFAC find a little shared structure, too little to read as latent groups.** The checks are in [`structure_analysis.py`](scripts/structure_analysis.py).
 
 ![NMF against shuffled columns and held-out PARAFAC error](outputs/structure_checks.png)
 
 - *The components are stable under resampling and unstable under preprocessing.* Rank-2 NMF returns the same components from 30 random starts (cosine at least 0.9999) and across 200 bootstrap resamples of countries (5th percentile 0.989). Changing how the data are scaled moves the second component a lot: log GDP and log inflation give cosine 0.63, percentile ranks 0.86 and complete cases only 0.66. The first component moves less (0.90, 0.74, 0.96). Under the original min-max scaling GDP is below 0.01 for 77% of countries, so it cannot carry weight in the factors.
-- *NMF barely beats the same columns shuffled.* Relative error of the real data against 40 column-shuffled copies: rank 2 gives 0.371 against 0.388 on average (best shuffle 0.375). Rank 3 gives 0.287 against 0.309 (best 0.288). Rank 1 is slightly worse than the shuffled average (0.542 against 0.535). Error falls steadily from rank 1 to 5 (0.54, 0.37, 0.29, 0.21, 0.13) with no elbow that would point to a rank.
+- *NMF beats the same columns shuffled, but only just.* Relative error of the real data against 40 column-shuffled copies: rank 2 gives 0.371 against 0.388 on average (best shuffle 0.375). The real data beats every shuffle, a permutation p of at most 1/41 (0.024), so the structure is unlikely to be chance. Its size is the problem: the gain over shuffling is about 4% of the error. Rank 3 gives 0.287 against 0.309 (best 0.288). Rank 1 is slightly worse than the shuffled average (0.542 against 0.535). Error falls steadily from rank 1 to 5 (0.54, 0.37, 0.29, 0.21, 0.13) with no elbow that would point to a rank.
 - *A country's own average beats the tensor model.* Holding out 10% of observed cells (1,038), standardised RMSE is 0.97 for the indicator mean and 0.84, 0.81, 0.71, 0.62 for PARAFAC ranks 1 to 4. Rank 5 is unstable (1.08, from 0.77 to 1.61 across seeds), and rank 3 ranges from 0.67 to 0.77. Predicting each cell from that country's other years gives 0.29, far better than any rank.
 - *Reading.* The panel is dominated by persistent country levels. Every extra component fits some of that persistence, which is why error keeps falling, but it does not reveal groups of indicators that move together beyond what each indicator's own distribution implies.
 
